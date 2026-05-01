@@ -32,10 +32,11 @@ MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'model_wei
 
 # The prompt that constrains the model to output a single letter.
 PROMPT = (
-    "This image contains a multiple-choice question with four options labeled A, B, C, D. "
-    "Read the question and options carefully, then respond with ONLY a single letter: "
-    "A, B, C, or D. Do not include any explanation, punctuation, or extra text. "
-    "Just the single letter of the correct answer."
+    "You are an expert in deep learning and machine learning. "
+    "The image shows a multiple-choice question with options labeled (A), (B), (C), and (D). "
+    "Carefully read the question and all four options. Identify the single correct answer. "
+    "Output ONLY one character: A, B, C, or D. "
+    "No explanation, no punctuation, no extra words. Just the letter."
 )
 
 # Default fallback if model output cannot be parsed
