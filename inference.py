@@ -7,10 +7,27 @@ Usage:
 
 Reads images from <test_dir>/images/ based on <test_dir>/test.csv
 and writes submission.csv in the current working directory.
+
+This script is designed to run with NO internet access.
 """
 
-import argparse
+# ======================================================================
+# CRITICAL: Set offline-mode env vars BEFORE importing transformers/HF
+# These prevent any silent network calls (telemetry, hub check, etc.)
+# ======================================================================
 import os
+os.environ['HF_HUB_OFFLINE'] = '1'
+os.environ['TRANSFORMERS_OFFLINE'] = '1'
+os.environ['HF_DATASETS_OFFLINE'] = '1'
+os.environ['HF_HUB_DISABLE_TELEMETRY'] = '1'
+os.environ['HF_HUB_DISABLE_IMPLICIT_TOKEN'] = '1'
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Cache dir set to local script dir to avoid any ~/.cache lookups
+os.environ['HF_HOME'] = os.path.join(SCRIPT_DIR, '.hf_cache')
+os.environ['TRANSFORMERS_CACHE'] = os.path.join(SCRIPT_DIR, '.hf_cache')
+
+import argparse
 import re
 import sys
 import traceback
@@ -28,7 +45,7 @@ from qwen_vl_utils import process_vision_info
 # -------------------------------------------------------------------
 # Local path where setup.bash downloaded the model weights.
 # This MUST exist before inference.py runs (no internet at inference time).
-MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'model_weights')
+MODEL_PATH = os.path.join(SCRIPT_DIR, 'model_weights')
 
 # The prompt that constrains the model to output a single letter.
 PROMPT = (
@@ -70,15 +87,22 @@ def load_model_and_processor(model_path: str):
             f'Did setup.bash run successfully?'
         )
 
+    # Verify critical files exist before trying to load
+    for f in ['config.json']:
+        if not os.path.isfile(os.path.join(model_path, f)):
+            raise FileNotFoundError(
+                f'Missing required model file: {f} in {model_path}'
+            )
+
     model = Qwen2VLForConditionalGeneration.from_pretrained(
         model_path,
         torch_dtype=torch.float16,
         device_map='auto',
-        local_files_only=True,
+        local_files_only=True,  # Forbid any network call
     )
     processor = AutoProcessor.from_pretrained(
         model_path,
-        local_files_only=True,
+        local_files_only=True,  # Forbid any network call
     )
     model.eval()
     print('[inference] Model loaded.', flush=True)
@@ -191,7 +215,7 @@ def main():
         try:
             answer = predict_single(model, processor, image_path)
         except Exception as e:
-            # Don't crash on one bad image — log and use fallback
+            # Don't crash on one bad image - log and use fallback
             print(f'[inference] WARN: failed on {image_id}: {e}', file=sys.stderr)
             answer = FALLBACK_ANSWER
         predictions.append(answer)
